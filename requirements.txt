@@ -1,0 +1,24 @@
+# Core dependencies for SVG to GLB extrusion
+trimesh[easy]>=4.0.0
+shapely>=2.0.0
+numpy>=1.20.0
+
+# For SVG parsing and processing (required)
+svgpathtools>=1.4.0
+
+# For SVG to PNG rendering (optional but recommended)
+cairosvg>=2.5.0
+pillow>=8.0.0
+
+# For spatial indexing (required for trimesh operations)
+rtree>=1.0.0
+
+# For triangulation (required for mesh generation)
+mapbox-earcut>=1.0.0
+triangle>=20200424
+
+# For GLB export (included in trimesh[easy] but listed for clarity)
+pygltflib>=1.14.0
+
+# Scientific computing stack
+scipy>=1.7.0 
