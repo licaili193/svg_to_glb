@@ -242,42 +242,148 @@ class SVGToGLBExtruder:
     
     def _svg_path_to_polygon(self, svg_path, attributes):
         """
-        Convert an SVG path to a shapely polygon.
+        Convert an SVG path to a shapely polygon, handling discontinuities properly.
         
         Args:
             svg_path: svgpathtools Path object
             attributes (dict): SVG path attributes
             
         Returns:
-            shapely.geometry.Polygon or None
+            shapely.geometry.Polygon or MultiPolygon or None
         """
         try:
-            # Sample the path to get discrete points with higher resolution for complex shapes
-            path_length = svg_path.length()
-            if path_length == 0:
+            # Check path continuity and split if needed
+            continuous_subpaths = self._split_path_at_discontinuities(svg_path)
+            
+            if not continuous_subpaths:
                 return None
+            
+            # Process each continuous subpath separately
+            valid_polygons = []
+            for subpath_segments in continuous_subpaths:
+                polygon = self._process_continuous_subpath(subpath_segments, attributes)
+                if polygon is not None:
+                    valid_polygons.append(polygon)
+            
+            if not valid_polygons:
+                return None
+            elif len(valid_polygons) == 1:
+                return valid_polygons[0]
+            else:
+                # Return MultiPolygon for multiple discontinuous parts
+                from shapely.geometry import MultiPolygon
+                return MultiPolygon(valid_polygons)
                 
-            # Use higher sampling for complex paths
-            num_samples = max(200, int(path_length / (self.resolution * 0.5)))
+        except Exception as e:
+            # Don't print error for every failed path as it clutters output
+            return None
+    
+    def _split_path_at_discontinuities(self, svg_path):
+        """
+        Split an SVG path into continuous subpaths at discontinuity points.
+        
+        Args:
+            svg_path: svgpathtools Path object
+            
+        Returns:
+            list: List of continuous subpath segments
+        """
+        if len(svg_path) == 0:
+            return []
+        
+        continuous_subpaths = []
+        current_subpath = []
+        discontinuity_count = 0
+        
+        for i, segment in enumerate(svg_path):
+            if i == 0:
+                # First segment always starts a new subpath
+                current_subpath = [segment]
+            else:
+                # Check if this segment is continuous with the previous
+                prev_segment = svg_path[i-1]
+                gap_distance = abs(segment.start - prev_segment.end)
+                
+                if gap_distance > 1e-6:  # Significant gap = discontinuity
+                    discontinuity_count += 1
+                    
+                    # Save the current subpath and start a new one
+                    if current_subpath:
+                        continuous_subpaths.append(current_subpath)
+                    current_subpath = [segment]
+                else:
+                    # Continuous - add to current subpath
+                    current_subpath.append(segment)
+        
+        # Don't forget the last subpath
+        if current_subpath:
+            continuous_subpaths.append(current_subpath)
+        
+        if discontinuity_count > 0:
+            print(f"  ⚠️  Split path with {discontinuity_count} discontinuities into {len(continuous_subpaths)} continuous subpaths")
+        
+        return continuous_subpaths
+    
+    def _process_continuous_subpath(self, segments, attributes):
+        """
+        Process a continuous subpath into a polygon.
+        
+        Args:
+            segments: List of continuous path segments
+            attributes (dict): SVG path attributes
+            
+        Returns:
+            shapely.geometry.Polygon or None
+        """
+        if not segments:
+            return None
+            
+        try:
+            # Calculate total length of this subpath
+            subpath_length = sum(segment.length() for segment in segments)
+            
+            if subpath_length == 0:
+                return None
+            
+            # Use adaptive sampling based on subpath complexity and length
+            base_samples = max(20, int(subpath_length * 2))  # 2 samples per unit length minimum
+            max_samples = 500  # Cap per subpath to prevent excessive computation
+            num_samples = min(base_samples, max_samples)
             
             points = []
-            for i in range(num_samples + 1):
-                t = i / num_samples
-                try:
-                    point = svg_path.point(t)
-                    points.append([point.real, point.imag])
-                except:
+            last_point = None
+            
+            # Sample each segment proportionally
+            for segment in segments:
+                segment_length = segment.length()
+                if segment_length == 0:
                     continue
-            
-            if len(points) < 3:
-                return None
-            
-            # Remove duplicate consecutive points
-            filtered_points = [points[0]]
-            for point in points[1:]:
-                if np.linalg.norm(np.array(point) - np.array(filtered_points[-1])) > 1e-3:
-                    filtered_points.append(point)
-            points = filtered_points
+                
+                # Number of samples for this segment (proportional to length)
+                segment_samples = max(3, int((segment_length / subpath_length) * num_samples))
+                
+                for i in range(segment_samples):
+                    t = i / (segment_samples - 1) if segment_samples > 1 else 0
+                    try:
+                        complex_point = segment.point(t)
+                        point = [float(complex_point.real), float(complex_point.imag)]
+                        
+                        # Skip invalid points
+                        if any(not np.isfinite(coord) for coord in point):
+                            continue
+                            
+                        # Skip duplicate points (more precise threshold)
+                        if last_point is not None:
+                            distance = np.linalg.norm(np.array(point) - np.array(last_point))
+                            if distance < 1e-6:  # Very small threshold for duplicates
+                                continue
+                        
+                        points.append(point)
+                        last_point = point
+                        
+                    except Exception as e:
+                        # Skip problematic points but continue sampling
+                        continue
             
             if len(points) < 3:
                 return None
@@ -293,8 +399,18 @@ class SVGToGLBExtruder:
             except (ValueError, TypeError):
                 stroke_width = self.stroke_width
             
-            # Check if path is closed (forms a loop)
-            is_closed = np.linalg.norm(np.array(points[0]) - np.array(points[-1])) < 1e-2
+            # Check if subpath is closed (forms a loop)
+            is_closed = np.linalg.norm(np.array(points[0]) - np.array(points[-1])) < 1e-3
+            
+            # For very small paths, use a relative threshold instead
+            if not is_closed:
+                path_bbox_size = max(
+                    max(p[0] for p in points) - min(p[0] for p in points),
+                    max(p[1] for p in points) - min(p[1] for p in points)
+                )
+                if path_bbox_size > 0:
+                    relative_threshold = path_bbox_size * 0.01  # 1% of bounding box
+                    is_closed = np.linalg.norm(np.array(points[0]) - np.array(points[-1])) < relative_threshold
             
             # Strategy 1: Try as filled shape if fill is specified or path is closed
             if (fill and fill.lower() not in ['none', 'transparent', '']) or is_closed:
@@ -351,38 +467,52 @@ class SVGToGLBExtruder:
             return None
             
         except Exception as e:
-            # Don't print error for every failed path as it clutters output
             return None
     
     def convert_strokes_to_fills(self, polygons):
         """
         Since we're already handling stroke conversion in _svg_path_to_polygon,
         this method just validates and cleans up the polygons.
+        Now also handles MultiPolygon objects from discontinuous paths.
         
         Args:
-            polygons (list): List of shapely polygons
+            polygons (list): List of shapely polygons (may include MultiPolygons)
             
         Returns:
-            list: Cleaned list of polygons
+            list: Cleaned list of individual polygons
         """
         if not polygons:
             print("Warning: No polygons provided")
             return None
         
         valid_polygons = []
-        for poly in polygons:
-            if poly is not None and hasattr(poly, 'is_valid') and poly.is_valid and not poly.is_empty:
-                valid_polygons.append(poly)
+        multipolygon_count = 0
         
-        print(f"✓ Validated {len(valid_polygons)} polygons")
+        for poly in polygons:
+            if poly is not None:
+                # Handle MultiPolygon objects from discontinuous paths
+                if isinstance(poly, MultiPolygon):
+                    multipolygon_count += 1
+                    for sub_poly in poly.geoms:
+                        if sub_poly is not None and hasattr(sub_poly, 'is_valid') and sub_poly.is_valid and not sub_poly.is_empty:
+                            valid_polygons.append(sub_poly)
+                # Handle regular Polygon objects
+                elif hasattr(poly, 'is_valid') and poly.is_valid and not poly.is_empty:
+                    valid_polygons.append(poly)
+        
+        if multipolygon_count > 0:
+            print(f"✓ Expanded {multipolygon_count} discontinuous path(s) into {len(valid_polygons)} individual polygons")
+        else:
+            print(f"✓ Validated {len(valid_polygons)} polygons")
         return valid_polygons
     
     def handle_complex_geometry(self, polygons):
         """
         Handle complex geometry issues like self-intersections and holes.
+        Now also handles discontinuous paths that were split into MultiPolygons.
         
         Args:
-            polygons (list): List of shapely polygons
+            polygons (list): List of shapely polygons (including MultiPolygons from discontinuous paths)
             
         Returns:
             list: Processed polygons ready for extrusion
@@ -391,48 +521,53 @@ class SVGToGLBExtruder:
             processed_polygons = []
             invalid_count = 0
             fixed_count = 0
+            discontinuous_count = 0
             
             for i, poly in enumerate(polygons):
                 if isinstance(poly, (Polygon, MultiPolygon)):
                     original_poly = poly
                     
-                    # Handle self-intersections by making geometry valid
-                    if not poly.is_valid:
-                        invalid_count += 1
-                        try:
-                            poly = poly.buffer(0)  # This often fixes self-intersections
-                            if poly.is_valid and not poly.is_empty:
+                    # First, handle MultiPolygons from discontinuous paths
+                    if isinstance(poly, MultiPolygon):
+                        discontinuous_count += 1
+                        # Process each sub-polygon separately
+                        for sub_poly in poly.geoms:
+                            processed_sub, was_invalid, was_fixed = self._process_single_polygon(sub_poly)
+                            if was_invalid:
+                                invalid_count += 1
+                            if was_fixed:
                                 fixed_count += 1
-                        except:
-                            # If buffer fails, try a different approach
-                            try:
-                                from shapely import make_valid
-                                poly = make_valid(original_poly)
-                                if poly.is_valid and not poly.is_empty:
-                                    fixed_count += 1
-                            except:
-                                # Skip this polygon if we can't fix it
-                                continue
-                    
-                    # Only simplify if the polygon is relatively large to avoid losing detail
-                    if poly.is_valid and hasattr(poly, 'area') and poly.area > 10:
-                        # Use gentler simplification to preserve details
-                        simplified = simplify(poly, tolerance=0.005)
-                        if simplified.is_valid and not simplified.is_empty:
-                            poly = simplified
-                    
-                    if poly.is_valid and not poly.is_empty:
-                        if isinstance(poly, MultiPolygon):
-                            # Split multipolygons into individual polygons
-                            for sub_poly in poly.geoms:
-                                if sub_poly.is_valid and not sub_poly.is_empty and hasattr(sub_poly, 'area') and sub_poly.area > 1e-6:
-                                    processed_polygons.append(sub_poly)
-                        else:
-                            if hasattr(poly, 'area') and poly.area > 1e-6:
-                                processed_polygons.append(poly)
+                            if processed_sub is not None:
+                                if isinstance(processed_sub, MultiPolygon):
+                                    # Recursively handle nested MultiPolygons
+                                    for nested_poly in processed_sub.geoms:
+                                        if nested_poly.is_valid and not nested_poly.is_empty and hasattr(nested_poly, 'area') and nested_poly.area > 1e-6:
+                                            processed_polygons.append(nested_poly)
+                                else:
+                                    if processed_sub.is_valid and not processed_sub.is_empty and hasattr(processed_sub, 'area') and processed_sub.area > 1e-6:
+                                        processed_polygons.append(processed_sub)
+                    else:
+                        # Handle regular Polygons
+                        processed_poly, was_invalid, was_fixed = self._process_single_polygon(poly)
+                        if was_invalid:
+                            invalid_count += 1
+                        if was_fixed:
+                            fixed_count += 1
+                        if processed_poly is not None:
+                            if isinstance(processed_poly, MultiPolygon):
+                                # Split MultiPolygons into individual polygons
+                                for sub_poly in processed_poly.geoms:
+                                    if sub_poly.is_valid and not sub_poly.is_empty and hasattr(sub_poly, 'area') and sub_poly.area > 1e-6:
+                                        processed_polygons.append(sub_poly)
+                            else:
+                                if processed_poly.is_valid and not processed_poly.is_empty and hasattr(processed_poly, 'area') and processed_poly.area > 1e-6:
+                                    processed_polygons.append(processed_poly)
             
             if invalid_count > 0:
                 print(f"✓ Fixed {fixed_count}/{invalid_count} invalid polygons")
+            
+            if discontinuous_count > 0:
+                print(f"✓ Processed {discontinuous_count} discontinuous paths (split at gaps)")
             
             print(f"✓ Processed complex geometry: {len(processed_polygons)} valid polygons")
             return processed_polygons
@@ -440,6 +575,52 @@ class SVGToGLBExtruder:
         except Exception as e:
             print(f"Error handling complex geometry: {e}")
             return polygons
+    
+    def _process_single_polygon(self, poly):
+        """
+        Process a single polygon to fix issues and simplify if needed.
+        
+        Args:
+            poly: Single Polygon object
+            
+        Returns:
+            tuple: (processed_polygon_or_None, was_invalid, was_fixed)
+        """
+        try:
+            original_poly = poly
+            was_invalid = False
+            was_fixed = False
+            
+            # Handle self-intersections by making geometry valid
+            if not poly.is_valid:
+                was_invalid = True
+                try:
+                    poly = poly.buffer(0)  # This often fixes self-intersections
+                    if poly.is_valid and not poly.is_empty:
+                        was_fixed = True
+                except:
+                    # If buffer fails, try a different approach
+                    try:
+                        from shapely import make_valid
+                        poly = make_valid(original_poly)
+                        if poly.is_valid and not poly.is_empty:
+                            was_fixed = True
+                    except:
+                        # Skip this polygon if we can't fix it
+                        return None, was_invalid, was_fixed
+            
+            # Only simplify if the polygon is relatively large to avoid losing detail
+            if poly.is_valid and hasattr(poly, 'area') and poly.area > 10:
+                # Use gentler simplification to preserve details
+                simplified = simplify(poly, tolerance=0.005)
+                if simplified.is_valid and not simplified.is_empty:
+                    poly = simplified
+            
+            result = poly if poly.is_valid and not poly.is_empty else None
+            return result, was_invalid, was_fixed
+            
+        except Exception as e:
+            return None, False, False
     
     def polygons_to_path2d(self, polygons):
         """
@@ -452,53 +633,113 @@ class SVGToGLBExtruder:
             trimesh.path.Path2D: Path2D object ready for extrusion
         """
         try:
-            # Combine all polygons into a single path
-            vertices = []
-            entities = []
+            # Use trimesh's built-in polygon handling for better reliability
+            from trimesh.path.entities import Line
+            from shapely.geometry import MultiPolygon
+            
+            # Combine all polygons for unified processing
+            all_vertices = []
+            all_entities = []
             
             for poly in polygons:
                 if isinstance(poly, Polygon):
-                    # Add exterior coordinates
-                    coords = list(poly.exterior.coords)
-                    if len(coords) >= 3:
-                        start_idx = len(vertices)
-                        vertices.extend(coords[:-1])  # Exclude duplicate last point
+                    # Process exterior boundary
+                    ext_coords = list(poly.exterior.coords)
+                    if len(ext_coords) >= 4:  # At least 3 unique points + 1 closing point
+                        # Remove the duplicate closing point
+                        ext_coords = ext_coords[:-1]
                         
-                        # Create line entities connecting the vertices
-                        for i in range(len(coords) - 1):
-                            next_i = (i + 1) % (len(coords) - 1)
-                            line = trimesh.path.entities.Line([start_idx + i, start_idx + next_i])
-                            entities.append(line)
-                    
-                    # Add holes (interiors)
-                    for interior in poly.interiors:
-                        coords = list(interior.coords)
-                        if len(coords) >= 3:
-                            start_idx = len(vertices)
-                            vertices.extend(coords[:-1])  # Exclude duplicate last point
+                        if len(ext_coords) >= 3:
+                            start_idx = len(all_vertices)
+                            all_vertices.extend([[pt[0], pt[1]] for pt in ext_coords])
                             
-                            # Create line entities for the hole (reverse direction)
-                            for i in range(len(coords) - 2, -1, -1):
-                                next_i = (i - 1) % (len(coords) - 1)
-                                line = trimesh.path.entities.Line([start_idx + i, start_idx + next_i])
-                                entities.append(line)
+                            # Create proper closed loop - connect each point to the next
+                            for i in range(len(ext_coords)):
+                                next_i = (i + 1) % len(ext_coords)
+                                line = Line([start_idx + i, start_idx + next_i])
+                                all_entities.append(line)
+                    
+                    # Process holes (interior boundaries) 
+                    for interior in poly.interiors:
+                        hole_coords = list(interior.coords)
+                        if len(hole_coords) >= 4:  # At least 3 unique points + 1 closing point
+                            # Remove the duplicate closing point
+                            hole_coords = hole_coords[:-1]
+                            
+                            if len(hole_coords) >= 3:
+                                start_idx = len(all_vertices)
+                                all_vertices.extend([[pt[0], pt[1]] for pt in hole_coords])
+                                
+                                # For holes, maintain the same orientation as given in shapely
+                                # (shapely handles the correct orientation internally)
+                                for i in range(len(hole_coords)):
+                                    next_i = (i + 1) % len(hole_coords)
+                                    line = Line([start_idx + i, start_idx + next_i])
+                                    all_entities.append(line)
             
-            if not vertices:
+            if not all_vertices:
                 print("Error: No vertices found in polygons")
                 return None
             
-            # Convert to numpy array and ensure 2D
-            vertices_array = np.array(vertices)
-            if vertices_array.shape[1] > 2:
-                vertices_array = vertices_array[:, :2]
+            # Convert to numpy array
+            vertices_array = np.array(all_vertices, dtype=np.float64)
             
-            path_2d = Path2D(entities=entities, vertices=vertices_array)
-            print(f"✓ Created Path2D with {len(vertices)} vertices and {len(entities)} entities")
+            # Create Path2D with proper entity list
+            path_2d = Path2D(entities=all_entities, vertices=vertices_array)
+            
+            print(f"✓ Created Path2D with {len(all_vertices)} vertices and {len(all_entities)} entities")
+            
+            # Validate the path and provide debugging info
+            try:
+                if hasattr(path_2d, 'polygons_closed'):
+                    closed_polys = path_2d.polygons_closed
+                    if closed_polys is not None and len(closed_polys) > 0:
+                        total_area = sum([p.area for p in closed_polys])
+                        print(f"  Found {len(closed_polys)} closed polygon(s), total area: {total_area:.2f}")
+                    else:
+                        print("  Warning: No closed polygons found - check path connectivity")
+                        
+                if hasattr(path_2d, 'polygons_full'):
+                    all_polys = path_2d.polygons_full
+                    if all_polys is not None:
+                        print(f"  Total polygons (including open): {len(all_polys)}")
+                    
+            except Exception as e:
+                print(f"  Warning: Could not validate path geometry: {e}")
             
             return path_2d
             
         except Exception as e:
             print(f"Error converting polygons to Path2D: {e}")
+            print("Attempting alternative approach...")
+            
+            # Fallback: Use simpler approach without holes
+            try:
+                vertices = []
+                entities = []
+                
+                for poly in polygons:
+                    if isinstance(poly, Polygon):
+                        # Only process exterior (skip holes for this fallback)
+                        coords = list(poly.exterior.coords)[:-1]  # Remove duplicate
+                        if len(coords) >= 3:
+                            start_idx = len(vertices)
+                            vertices.extend([[pt[0], pt[1]] for pt in coords])
+                            
+                            # Simple sequential connection
+                            for i in range(len(coords)):
+                                next_i = (i + 1) % len(coords)
+                                entities.append(Line([start_idx + i, start_idx + next_i]))
+                
+                if vertices:
+                    vertices_array = np.array(vertices, dtype=np.float64)
+                    path_2d = Path2D(entities=entities, vertices=vertices_array)
+                    print(f"✓ Created fallback Path2D with {len(vertices)} vertices")
+                    return path_2d
+                    
+            except Exception as e2:
+                print(f"Fallback also failed: {e2}")
+                
             return None
     
     def extrude_to_3d(self, path_2d):
@@ -538,6 +779,9 @@ class SVGToGLBExtruder:
                 print(f"  Volume: {mesh.volume:.2f}")
             else:
                 print(f"✓ Extruded to 3D mesh")
+
+            # Flip y-axis so that SVG y-down becomes y-up in 3D
+            mesh.apply_scale([1, -1, 1])
             
             return mesh
             
