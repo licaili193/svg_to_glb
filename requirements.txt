@@ -21,4 +21,7 @@ triangle>=20200424
 pygltflib>=1.14.0
 
 # Scientific computing stack
-scipy>=1.7.0 
+scipy>=1.7.0
+
+# For coordinate verification and visualization
+matplotlib>=3.5.0 

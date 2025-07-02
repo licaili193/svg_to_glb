@@ -1,0 +1,16 @@
+{
+  "name": "osmd-renderer",
+  "version": "1.0.0",
+  "description": "OSMD renderer for infinite width sheet music",
+  "main": "render_music.js",
+  "scripts": {
+    "render": "node render_music.js"
+  },
+  "dependencies": {
+    "opensheetmusicdisplay": "^1.8.5",
+    "jsdom": "^22.1.0", 
+    "canvas": "^2.11.2",
+    "sharp": "^0.32.6"
+  },
+  "type": "module"
+} 

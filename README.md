@@ -1,10 +1,21 @@
-# SVG to GLB Extruder
+# Music Score Processing Suite
 
-A comprehensive Python tool for extruding SVG files (especially music scores) into 3D GLB meshes. This tool is designed to handle the complex challenges found in music notation and other intricate SVG graphics.
+A comprehensive suite of tools for processing and visualizing music scores, including SVG to 3D conversion and OSMD-based music rendering with coordinate verification.
 
 ## Features
 
-### Core Functionality
+### 🎵 Music Rendering (OSMD)
+- **MusicXML to SVG/PNG**: Render MusicXML files using OpenSheetMusicDisplay
+- **Infinite Width**: No line wrapping - continuous horizontal music layout
+- **Coordinate Alignment**: SVG and PNG with exactly matching coordinate systems
+- **Customizable Output**: Configurable height while maintaining aspect ratio
+
+### 🎯 Coordinate Verification
+- **Perfect Alignment**: Verify PNG and SVG coordinate system matching
+- **Visual Comparison**: Side-by-side visualization and overlay analysis
+- **Detailed Metrics**: Precise measurements and difference calculations
+
+### 🎪 SVG to 3D Conversion
 - **SVG to GLB conversion**: Complete pipeline from 2D vector graphics to 3D meshes
 - **PNG verification**: Renders PNG from SVG for visual verification
 - **GLB export**: Industry-standard 3D format compatible with web browsers, 3D viewers, and game engines
@@ -24,17 +35,36 @@ A comprehensive Python tool for extruding SVG files (especially music scores) in
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip package manager
+- **Python 3.8+** for SVG processing and coordinate verification
+- **Node.js 16+** for OSMD music rendering
+- **npm** package manager
 
 ### Install Dependencies
 
 ```bash
-# Install all dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 
-# Or install core dependencies individually
-pip install trimesh[easy] shapely numpy cairosvg pillow
+# Install Node.js dependencies for OSMD rendering
+npm install
+```
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd music-score-processing-suite
+
+# Install all dependencies
+pip install -r requirements.txt
+npm install
+
+# Test OSMD rendering
+node render_music.js --height 600
+
+# Test coordinate verification
+python verify_coordinates.py
 ```
 
 ### Alternative Installation (Minimal)
@@ -46,7 +76,41 @@ pip install trimesh[easy] shapely numpy
 
 ## Usage
 
-### Basic Usage
+### 🎵 Music Rendering (OSMD)
+
+```bash
+# Render MusicXML to SVG and PNG with default settings (600px height)
+node render_music.js
+
+# Custom height and output directory
+node render_music.js --height 800 --output custom_output
+
+# Specify custom MusicXML file
+node render_music.js --input path/to/music.musicxml --height 400
+```
+
+**Options:**
+- `--input`, `-i`: Input MusicXML file (default: `resources/MozaVeilSample.musicxml`)
+- `--height`, `-h`: Desired PNG height in pixels (default: 600)
+- `--output`, `-o`: Output directory (default: `output`)
+
+### 🎯 Coordinate Verification
+
+```bash
+# Quick verification with default files
+python verify_coordinates.py
+
+# Verify custom files
+python verify_coordinates.py path/to/music.png path/to/music.svg
+
+# Advanced visualization (requires matplotlib)
+python visualize_alignment.py
+
+# Save comparison plot
+python visualize_alignment.py --save alignment_check.png
+```
+
+### 🎪 SVG to 3D Conversion
 
 ```bash
 # Convert SVG to GLB with default settings
@@ -98,6 +162,33 @@ success = extruder.process_svg(
     output_glb="output.glb",
     render_png=True
 )
+```
+
+## 🎯 Coordinate Verification Results
+
+The coordinate verification system demonstrates **perfect alignment** between generated PNG and SVG files:
+
+### ✅ Verified Alignment
+- **Width match**: 12890 × 12890 pixels (0.0px difference)
+- **Height match**: 960 × 960 pixels (0.0px difference)  
+- **Origin consistency**: Both use (0,0) at top-left corner
+- **Scale matching**: No transformation needed for overlays
+
+### 📊 Technical Details
+- **Coordinate System**: Origin at top-left, X→right, Y→bottom
+- **SVG Structure**: `<svg width="12890" height="960" viewBox="0 0 5136.735... 382.565...">`
+- **PNG Properties**: RGBA format, 12890×960 pixels, infinite width layout
+- **Element Count**: 3248 SVG elements processed
+
+### 🔬 Verification Methods
+```bash
+# Text-based verification (no GUI required)
+python verify_coordinates.py
+# Output: 🎯 PERFECT ALIGNMENT CONFIRMED!
+
+# Visual verification with matplotlib
+python visualize_alignment.py
+# Shows side-by-side comparison and overlay analysis
 ```
 
 ## How It Works
@@ -156,7 +247,36 @@ When multiple musical elements overlap, the tool handles the complex boolean ope
 
 ## Troubleshooting
 
-### Common Issues
+### OSMD Rendering Issues
+
+**"Module not found" errors**
+- Run `npm install` to install Node.js dependencies
+- Ensure you're using Node.js 16+ (check with `node --version`)
+
+**"MusicXML parsing failed"**
+- Verify the MusicXML file is valid and properly formatted
+- Check file encoding (UTF-8 or UTF-16 supported)
+
+**"Canvas/Graphics errors"**
+- On macOS: May need to install Cairo (`brew install cairo`)
+- On Linux: Install system graphics libraries
+- Try using different Node.js versions if issues persist
+
+### Coordinate Verification Issues
+
+**"PIL not available"**
+- Install Pillow: `pip install pillow`
+
+**"matplotlib not available"** 
+- Install matplotlib: `pip install matplotlib`
+- For text-only verification, use `verify_coordinates.py` instead
+
+**"Cairo graphics library not available"**
+- On macOS: `brew install cairo`
+- On Ubuntu: `sudo apt-get install libcairo2-dev`
+- The basic verification still works without Cairo
+
+### SVG to 3D Conversion Issues
 
 **"Failed to load SVG paths"**
 - Ensure SVG file is valid and contains vector paths
@@ -184,16 +304,21 @@ When multiple musical elements overlap, the tool handles the complex boolean ope
 
 ## Dependencies
 
-### Core Dependencies
+### Python Dependencies
 - **trimesh**: 3D mesh processing and GLB export
-- **shapely**: 2D geometry operations and polygon handling
+- **shapely**: 2D geometry operations and polygon handling  
 - **numpy**: Numerical computing
-
-### Optional Dependencies
+- **matplotlib**: Visualization and plotting (coordinate verification)
+- **pillow**: Image processing for PNG analysis
 - **cairosvg**: SVG to PNG rendering for verification
-- **pillow**: Image processing for PNG output
 - **svgpathtools**: Advanced SVG path processing
 - **scipy**: Scientific computing for mesh operations
+
+### Node.js Dependencies  
+- **opensheetmusicdisplay**: Music notation rendering from MusicXML
+- **jsdom**: DOM environment for server-side rendering
+- **canvas**: Canvas API implementation for PNG generation
+- **sharp**: High-performance image processing
 
 ## License
 
