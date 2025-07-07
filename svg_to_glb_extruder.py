@@ -518,12 +518,16 @@ class SVGToGLBExtruder:
             list: Processed polygons ready for extrusion
         """
         try:
+            # First, try to resolve overlapping simple strokes (like staff lines)
+            # This helps with musical notation where staff lines from adjacent measures overlap
+            resolved_polygons = self._resolve_overlapping_simple_strokes(polygons)
+            
             processed_polygons = []
             invalid_count = 0
             fixed_count = 0
             discontinuous_count = 0
             
-            for i, poly in enumerate(polygons):
+            for i, poly in enumerate(resolved_polygons):
                 if isinstance(poly, (Polygon, MultiPolygon)):
                     original_poly = poly
                     
@@ -575,6 +579,202 @@ class SVGToGLBExtruder:
         except Exception as e:
             print(f"Error handling complex geometry: {e}")
             return polygons
+    
+    def _resolve_overlapping_simple_strokes(self, polygons):
+        """
+        Resolve overlapping simple rectangular strokes (like staff lines) while preserving 
+        complex shapes with holes and self-intersections.
+        
+        Args:
+            polygons (list): List of shapely polygons
+            
+        Returns:
+            list: Processed polygons with simple overlaps resolved
+        """
+        try:
+            if not polygons:
+                return polygons
+            
+            # Separate simple strokes from complex shapes
+            simple_strokes = []
+            complex_shapes = []
+            
+            for poly in polygons:
+                if isinstance(poly, MultiPolygon):
+                    # MultiPolygons are generally complex
+                    complex_shapes.append(poly)
+                elif isinstance(poly, Polygon):
+                    if self._is_simple_rectangular_stroke(poly):
+                        simple_strokes.append(poly)
+                    else:
+                        complex_shapes.append(poly)
+                else:
+                    complex_shapes.append(poly)
+            
+            # If we have simple strokes, try to union overlapping ones
+            if simple_strokes:
+                print(f"  Detected {len(simple_strokes)} simple strokes, {len(complex_shapes)} complex shapes")
+                
+                # Group simple strokes by approximate orientation and position
+                stroke_groups = self._group_similar_strokes(simple_strokes)
+                
+                # Union overlapping strokes within each group
+                resolved_strokes = []
+                for group in stroke_groups:
+                    if len(group) > 1:
+                        # Try to union overlapping strokes in this group
+                        try:
+                            unioned = unary_union(group)
+                            if isinstance(unioned, MultiPolygon):
+                                resolved_strokes.extend(unioned.geoms)
+                            else:
+                                resolved_strokes.append(unioned)
+                        except Exception as e:
+                            # If union fails, keep individual strokes
+                            resolved_strokes.extend(group)
+                    else:
+                        resolved_strokes.extend(group)
+                
+                if len(resolved_strokes) < len(simple_strokes):
+                    print(f"  ✓ Resolved {len(simple_strokes)} simple strokes into {len(resolved_strokes)} unified strokes")
+                
+                # Combine resolved strokes with complex shapes
+                return resolved_strokes + complex_shapes
+            else:
+                # No simple strokes detected, return original
+                return polygons
+                
+        except Exception as e:
+            print(f"  Warning: Could not resolve overlapping strokes: {e}")
+            return polygons
+    
+    def _is_simple_rectangular_stroke(self, poly):
+        """
+        Check if a polygon is a simple rectangular stroke (like a staff line).
+        This includes both simple rectangles and buffered line strings.
+        
+        Args:
+            poly: Shapely Polygon
+            
+        Returns:
+            bool: True if it's a simple rectangular stroke
+        """
+        try:
+            if not isinstance(poly, Polygon) or not poly.is_valid:
+                return False
+            
+            # Check if it has holes (complex shapes usually have holes)
+            if len(poly.interiors) > 0:
+                return False
+            
+            # Get basic characteristics
+            bbox = poly.bounds
+            width = bbox[2] - bbox[0]
+            height = bbox[3] - bbox[1]
+            
+            if width <= 0 or height <= 0:
+                return False
+                
+            aspect_ratio = max(width, height) / min(width, height)
+            
+            # Staff lines typically have high aspect ratio (long and thin)
+            # This is the key indicator for line-like shapes
+            if aspect_ratio > 10:  # Lower threshold to catch more line-like shapes
+                return True
+            
+            # For polygons with exactly 4 vertices, check if it's a proper rectangle
+            coords = list(poly.exterior.coords)[:-1]  # Remove duplicate closing point
+            if len(coords) == 4:
+                # Check if it's roughly rectangular by examining the angles
+                # For a rectangle, consecutive edges should be roughly perpendicular
+                edges = []
+                for i in range(4):
+                    p1 = np.array(coords[i])
+                    p2 = np.array(coords[(i + 1) % 4])
+                    edge = p2 - p1
+                    edges.append(edge)
+                
+                # Check if edges are roughly perpendicular
+                tolerance = 0.1  # Allow some tolerance for angles
+                for i in range(4):
+                    edge1 = edges[i]
+                    edge2 = edges[(i + 1) % 4]
+                    
+                    # Normalize edges
+                    edge1_norm = edge1 / np.linalg.norm(edge1) if np.linalg.norm(edge1) > 0 else edge1
+                    edge2_norm = edge2 / np.linalg.norm(edge2) if np.linalg.norm(edge2) > 0 else edge2
+                    
+                    # Check if dot product is close to 0 (perpendicular)
+                    dot_product = np.dot(edge1_norm, edge2_norm)
+                    if abs(dot_product) > tolerance:
+                        return False
+                
+                # If we reach here, it's a proper rectangle
+                return True
+            
+            return False
+            
+        except Exception as e:
+            return False
+    
+    def _group_similar_strokes(self, strokes):
+        """
+        Group similar strokes that might be overlapping (like staff lines).
+        
+        Args:
+            strokes (list): List of simple stroke polygons
+            
+        Returns:
+            list: List of groups, where each group contains similar strokes
+        """
+        try:
+            if not strokes:
+                return []
+            
+            groups = []
+            remaining_strokes = strokes.copy()
+            
+            while remaining_strokes:
+                # Start a new group with the first remaining stroke
+                current_stroke = remaining_strokes.pop(0)
+                current_group = [current_stroke]
+                current_bounds = current_stroke.bounds
+                
+                # Find other strokes that might be in the same "line" (e.g., same staff line)
+                i = 0
+                while i < len(remaining_strokes):
+                    other_stroke = remaining_strokes[i]
+                    other_bounds = other_stroke.bounds
+                    
+                    # Check if strokes are roughly aligned (same y-coordinate range for horizontal lines)
+                    y_overlap = min(current_bounds[3], other_bounds[3]) - max(current_bounds[1], other_bounds[1])
+                    y_size = max(current_bounds[3] - current_bounds[1], other_bounds[3] - other_bounds[1])
+                    
+                    # Check if strokes potentially overlap or are adjacent
+                    x_gap = max(current_bounds[0], other_bounds[0]) - min(current_bounds[2], other_bounds[2])
+                    
+                    # If they have significant y-overlap and are close in x, they might be the same staff line
+                    if y_size > 0 and y_overlap / y_size > 0.5 and x_gap < 5:  # Allow small gaps
+                        current_group.append(other_stroke)
+                        remaining_strokes.pop(i)
+                        
+                        # Update bounds to include this stroke
+                        current_bounds = (
+                            min(current_bounds[0], other_bounds[0]),
+                            min(current_bounds[1], other_bounds[1]),
+                            max(current_bounds[2], other_bounds[2]),
+                            max(current_bounds[3], other_bounds[3])
+                        )
+                    else:
+                        i += 1
+                
+                groups.append(current_group)
+            
+            return groups
+            
+        except Exception as e:
+            print(f"  Warning: Could not group similar strokes: {e}")
+            return [[stroke] for stroke in strokes]  # Return each stroke as its own group
     
     def _process_single_polygon(self, poly):
         """

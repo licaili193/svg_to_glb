@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="osmdSvgPage1" width="12890" height="960" viewBox="0 0 5136.735262687351 382.5658796987799">
+  <g class="staffline" id="Voice0-1">
+    <g class="vf-measure" id="0">
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M20 43.2L148.6989792 43.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M20 53.2L148.6989792 53.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M20 63.2L148.6989792 63.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M20 73.2L148.6989792 73.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M20 83.2L148.6989792 83.2"/>
+      <rect stroke-width="0.3" fill="#000000" stroke="#000000" stroke-dasharray="none" x="148.6989792" y="42.7" width="1" height="41"/>
+    </g>
+    <g class="vf-measure" id="1">
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M148.6989792 43.2L258.970876 43.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M148.6989792 53.2L258.970876 53.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M148.6989792 63.2L258.970876 63.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M148.6989792 73.2L258.970876 73.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M148.6989792 83.2L258.970876 83.2"/>
+      <rect stroke-width="0.3" fill="#000000" stroke="#000000" stroke-dasharray="none" x="258.970876" y="42.7" width="1" height="41"/>
+      <g class="vf-stavenote" id="vf-auto1236">
+        <g class="vf-note" pointer-events="bounding-box">
+          <g class="vf-notehead" pointer-events="bounding-box">
+            <path stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" d="M198.1989792 53.2M198.1989792 55.64296L198.1989792 53.2L204.4608192 53.2L210.7507392 53.2L210.7507392 55.64296L210.7507392 58.08592L204.4608192 58.08592L198.1989792 58.08592L198.1989792 55.64296"/>
+          </g>
+        </g>
+        <g class="vf-modifiers"/>
+      </g>
+    </g>
+    <g class="vf-measure" id="2">
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M258.970876 43.2L422.494441088 43.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M258.970876 53.2L422.494441088 53.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M258.970876 63.2L422.494441088 63.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M258.970876 73.2L422.494441088 73.2"/>
+      <path stroke-width="1" fill="none" stroke="#000000" stroke-dasharray="none" d="M258.970876 83.2L422.494441088 83.2"/>
+      <rect stroke-width="0.3" fill="#000000" stroke="#000000" stroke-dasharray="none" x="422.494441088" y="42.7" width="1" height="41"/>
+      <g class="vf-stavenote" id="vf-auto1336">
+        <g class="vf-note" pointer-events="bounding-box">
+          <g class="vf-notehead" pointer-events="bounding-box">
+            <path stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" d="M334.970876 53.2M334.970876 55.64296L334.970876 53.2L341.232716 53.2L347.522636 53.2L347.522636 55.64296L347.522636 58.08592L341.232716 58.08592L334.970876 58.08592L334.970876 55.64296"/>
+          </g>
+        </g>
+        <g class="vf-modifiers"/>
+      </g>
+    </g>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="1142.6372402681873" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="1542.86557198552" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="1698.8620243361017" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="2039.2268071217436" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="16px" font-weight="normal" font-style="normal" x="2075.6909630318064" y="124.6" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="2560.832002951306" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="2806.5547015333377" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="3287.1877298476916" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="3513.9210864219103" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="3603.3585052734734" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="3856.3412288781606" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="4107.7693514812745" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="4277.980362121993" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="4482.302476824851" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-text dash">
+    <text stroke-width="0.3" fill="#000000" stroke="none" stroke-dasharray="none" font-family="Times New Roman" font-size="20px" font-weight="normal" font-style="normal" x="4661.400249940476" y="126.19999999999999" style="white-space: pre;">-</text>
+  </g>
+  <g class="vf-line">
+    <path stroke-width="1.2" fill="none" stroke="#000000" stroke-dasharray="none" d="M4715.523578706101 125.19999999999999L4730.426194971726 125.19999999999999"/>
+  </g>
+  <g class="vf-line">
+    <path stroke-width="1.2" fill="none" stroke="#000000" stroke-dasharray="none" d="M4850.51679108735 125.19999999999999L4867.234918787351 125.19999999999999"/>
+  </g>
+  <g class="staffline" id="Piano1-2"/>
+</svg>
