@@ -753,8 +753,9 @@ class SVGToGLBExtruder:
                     # Check if strokes potentially overlap or are adjacent
                     x_gap = max(current_bounds[0], other_bounds[0]) - min(current_bounds[2], other_bounds[2])
                     
-                    # If they have significant y-overlap and are close in x, they might be the same staff line
-                    if y_size > 0 and y_overlap / y_size > 0.5 and x_gap < 5:  # Allow small gaps
+                    # Be more conservative: require very high y-overlap and much smaller x-gap
+                    # This prevents merging strokes from different SVG groups that happen to overlap
+                    if y_size > 0 and y_overlap / y_size > 0.9 and x_gap < 1:  # Much tighter criteria
                         current_group.append(other_stroke)
                         remaining_strokes.pop(i)
                         
@@ -775,6 +776,69 @@ class SVGToGLBExtruder:
         except Exception as e:
             print(f"  Warning: Could not group similar strokes: {e}")
             return [[stroke] for stroke in strokes]  # Return each stroke as its own group
+    
+    def _prevent_polygon_overlap(self, polygons):
+        """
+        Apply tiny offsets to overlapping polygons to prevent trimesh from combining them.
+        
+        Args:
+            polygons (list): List of shapely polygons
+            
+        Returns:
+            list: List of polygons with small offsets applied to prevent overlap
+        """
+        try:
+            if not polygons:
+                return polygons
+            
+            offset_polygons = []
+            used_regions = []  # Track regions that have been used
+            
+            for i, poly in enumerate(polygons):
+                if not isinstance(poly, Polygon):
+                    offset_polygons.append(poly)
+                    continue
+                
+                bounds = poly.bounds
+                current_region = bounds
+                
+                # Check if this polygon's bounds overlap with any previous polygon
+                overlap_found = False
+                for prev_region in used_regions:
+                    # Check for overlap in both x and y
+                    x_overlap = (current_region[0] < prev_region[2] and current_region[2] > prev_region[0])
+                    y_overlap = (current_region[1] < prev_region[3] and current_region[3] > prev_region[1])
+                    
+                    if x_overlap and y_overlap:
+                        overlap_found = True
+                        break
+                
+                if overlap_found:
+                    # Apply a tiny offset to prevent exact overlap
+                    # Use a very small offset (0.001) that won't affect visual appearance
+                    offset = 0.001 * (len(offset_polygons) + 1)  # Progressive offset
+                    
+                    # Apply the offset by translating the polygon slightly
+                    from shapely.affinity import translate
+                    offset_poly = translate(poly, xoff=offset, yoff=offset)
+                    offset_polygons.append(offset_poly)
+                    
+                    # Update the region bounds to include the offset
+                    offset_bounds = offset_poly.bounds
+                    used_regions.append(offset_bounds)
+                    
+                    # Optionally print offset info for debugging
+                    # print(f"    Applied offset {offset:.3f} to polygon {i} to prevent overlap")
+                else:
+                    # No overlap, use original polygon
+                    offset_polygons.append(poly)
+                    used_regions.append(current_region)
+            
+            return offset_polygons
+            
+        except Exception as e:
+            print(f"  Warning: Could not apply overlap prevention: {e}")
+            return polygons  # Return original polygons if offsetting fails
     
     def _process_single_polygon(self, poly):
         """
@@ -833,6 +897,9 @@ class SVGToGLBExtruder:
             trimesh.path.Path2D: Path2D object ready for extrusion
         """
         try:
+            # Fix for overlapping polygons: Apply tiny offsets to prevent trimesh from combining them
+            offset_polygons = self._prevent_polygon_overlap(polygons)
+            
             # Use trimesh's built-in polygon handling for better reliability
             from trimesh.path.entities import Line
             from shapely.geometry import MultiPolygon
@@ -841,7 +908,7 @@ class SVGToGLBExtruder:
             all_vertices = []
             all_entities = []
             
-            for poly in polygons:
+            for poly in offset_polygons:
                 if isinstance(poly, Polygon):
                     # Process exterior boundary
                     ext_coords = list(poly.exterior.coords)
@@ -884,6 +951,8 @@ class SVGToGLBExtruder:
             # Convert to numpy array
             vertices_array = np.array(all_vertices, dtype=np.float64)
             
+
+            
             # Create Path2D with proper entity list
             path_2d = Path2D(entities=all_entities, vertices=vertices_array)
             
@@ -896,6 +965,7 @@ class SVGToGLBExtruder:
                     if closed_polys is not None and len(closed_polys) > 0:
                         total_area = sum([p.area for p in closed_polys])
                         print(f"  Found {len(closed_polys)} closed polygon(s), total area: {total_area:.2f}")
+                        
                     else:
                         print("  Warning: No closed polygons found - check path connectivity")
                         
